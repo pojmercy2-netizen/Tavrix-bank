@@ -15,6 +15,13 @@ export const useAuth = () => {
   const user = useState<User | null>('auth-user', () => {
     if (import.meta.client) {
       try {
+        const savedToken = localStorage.getItem('authToken')
+        if (savedToken && savedToken.startsWith('mock_token_')) {
+          localStorage.removeItem('authToken')
+          localStorage.removeItem('user')
+          localStorage.removeItem('userId')
+          return null
+        }
         const savedUser = localStorage.getItem('user')
         return savedUser ? JSON.parse(savedUser) : null
       } catch {
@@ -23,12 +30,18 @@ export const useAuth = () => {
     }
     return null
   })
+
   const token = useState<string | null>('auth-token', () => {
     if (import.meta.client) {
-      return localStorage.getItem('authToken')
+      const savedToken = localStorage.getItem('authToken')
+      if (savedToken && savedToken.startsWith('mock_token_')) {
+        return null
+      }
+      return savedToken
     }
     return null
   })
+
   const isLoading = ref(false)
   const error = ref<string | null>(null)
 
@@ -37,6 +50,16 @@ export const useAuth = () => {
     const savedToken = localStorage.getItem('authToken')
     const savedUser = localStorage.getItem('user')
     const savedUserId = localStorage.getItem('userId')
+
+    // Purge any stale mock token from previous sessions
+    if (savedToken && savedToken.startsWith('mock_token_')) {
+      localStorage.removeItem('authToken')
+      localStorage.removeItem('user')
+      localStorage.removeItem('userId')
+      token.value = null
+      user.value = null
+      return
+    }
 
     if (savedToken && savedUser) {
       token.value = savedToken
@@ -56,7 +79,7 @@ export const useAuth = () => {
   const healthCheck = async (): Promise<boolean> => {
     try {
       const response = await fetch('/api/health', {
-        signal: AbortSignal.timeout(1500)
+        signal: AbortSignal.timeout(5000)
       })
       return response.ok
     } catch {
@@ -79,7 +102,8 @@ export const useAuth = () => {
         const res = await fetch(`${API_BASE_URL}/auth/refresh-token`, {
           method: 'POST',
           credentials: 'include', // ensures cookie is sent
-          headers: { 'Content-Type': 'application/json' }
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({})
         })
 
         if (!res.ok) return null
@@ -135,6 +159,13 @@ export const useAuth = () => {
 
     try {
       const activeToken = token.value || localStorage.getItem('authToken')
+
+      // If active token is a fake mock token, reject immediately to avoid 401 spam
+      if (activeToken && activeToken.startsWith('mock_token_')) {
+        logout()
+        return { success: false, error: 'Session expired. Please log in again.' }
+      }
+
       let response = await makeRequest(activeToken)
 
       // Silent refresh on 401 for non-auth endpoints
@@ -175,38 +206,6 @@ export const useAuth = () => {
     error.value = null
 
     try {
-      const isHealthy = await healthCheck()
-
-      if (!isHealthy) {
-        console.warn('Backend server not running. Using mock login fallback.')
-        const isDefaultAdmin = emailVal.toLowerCase().includes('admin')
-        const mockUser: User = {
-          id: '1001',
-          email: emailVal,
-          fullName: (emailVal.split('@')[0] || '').toUpperCase(),
-          accountType: 'Checking',
-          status: 'Active',
-          isAdmin: isDefaultAdmin
-        }
-
-        token.value = 'mock_token_' + Date.now()
-        user.value = mockUser
-
-        localStorage.setItem('authToken', token.value)
-        localStorage.setItem('userId', mockUser.id)
-        localStorage.setItem('user', JSON.stringify(mockUser))
-
-        setTimeout(() => {
-          isLoading.value = false
-          if (isDefaultAdmin) {
-            navigateTo('/admin')
-          } else {
-            navigateTo('/dashboard')
-          }
-        }, 800)
-        return true
-      }
-
       const response = await apiCall<any>('/auth/login', 'POST', {
         email: emailVal,
         password: passwordVal
@@ -221,42 +220,52 @@ export const useAuth = () => {
         token.value = loginPayload.access_token
         localStorage.setItem('authToken', loginPayload.access_token)
 
-              // Fetch full profile using the Nuxt backend endpoint
-        const profileRes = await apiCall<any>('/dashboard/profile', 'GET')
-        // apiCall wraps server JSON: { success, data: <serverJson> }
-        // Server sendSuccess returns: { success, data: user }
-        // So actual user is at profileRes.data?.data?.data ?? profileRes.data?.data
-        const profileData = profileRes.data?.data?.data ?? profileRes.data?.data ?? profileRes.data
+        const rawUser = loginPayload.user || {}
+        const isAdminUser = rawUser.role === 'admin' || rawUser.role === 'superadmin' || rawUser.isAdmin === true
 
-        if (profileRes.success && profileData) {
-          const isAdminUser = profileData.role === 'admin' || profileData.role === 'superadmin'
-          const userData: User = {
-            id: profileData.id?.toString() || '1001',
-            email: profileData.email || emailVal,
-            fullName: profileData.fullName || profileData.full_name || emailVal.split('@')[0],
-            accountType: 'checking',
-            isAdmin: isAdminUser
-          }
-
-          user.value = userData
-          localStorage.setItem('userId', userData.id)
-          localStorage.setItem('user', JSON.stringify(userData))
-
-          isLoading.value = false
-          if (isAdminUser) {
-            navigateTo('/admin')
-          } else {
-            navigateTo('/dashboard')
-          }
-          return true
+        const userData: User = {
+          id: rawUser.id?.toString() || '1',
+          email: rawUser.email || emailVal,
+          fullName: rawUser.fullName || rawUser.full_name || (emailVal.split('@')[0] || 'User').toUpperCase(),
+          accountType: rawUser.accountType || 'checking',
+          status: rawUser.status || 'active',
+          isAdmin: isAdminUser
         }
+
+        user.value = userData
+        localStorage.setItem('userId', userData.id)
+        localStorage.setItem('user', JSON.stringify(userData))
+
+        // Background profile enrichment if needed (non-blocking)
+        apiCall<any>('/dashboard/profile', 'GET').then((profileRes) => {
+          const profileData = profileRes.data?.data?.data ?? profileRes.data?.data ?? profileRes.data
+          if (profileRes.success && profileData) {
+            const updatedUser: User = {
+              ...userData,
+              fullName: profileData.fullName || profileData.full_name || userData.fullName,
+              accountType: profileData.accountType || userData.accountType,
+              status: profileData.status || userData.status,
+              isAdmin: profileData.role === 'admin' || profileData.role === 'superadmin' || profileData.isAdmin === true
+            }
+            user.value = updatedUser
+            localStorage.setItem('user', JSON.stringify(updatedUser))
+          }
+        }).catch(() => {})
+
+        isLoading.value = false
+        if (isAdminUser) {
+          navigateTo('/admin')
+        } else {
+          navigateTo('/dashboard')
+        }
+        return true
       }
 
       error.value = response.error || (response.data?.error?.message) || 'Login failed. Check your credentials.'
       isLoading.value = false
       return false
     } catch (e: any) {
-      error.value = 'Failed to connect to backend.'
+      error.value = e?.message || 'Failed to connect to backend server. Please try again.'
       isLoading.value = false
       return false
     }
@@ -267,43 +276,10 @@ export const useAuth = () => {
     error.value = null
 
     try {
-      const isHealthy = await healthCheck()
-
-      if (!isHealthy) {
-        console.warn('Backend server not running. Using mock registration fallback.')
-        const isDefaultAdmin = emailVal.toLowerCase().includes('admin')
-        const mockUser: User = {
-          id: Math.floor(Math.random() * 10000).toString(),
-          email: emailVal,
-          fullName: fullNameVal,
-          accountType: accountTypeVal,
-          status: 'Active',
-          isAdmin: isDefaultAdmin
-        }
-
-        token.value = 'mock_token_' + Date.now()
-        user.value = mockUser
-
-        localStorage.setItem('authToken', token.value)
-        localStorage.setItem('userId', mockUser.id)
-        localStorage.setItem('user', JSON.stringify(mockUser))
-
-        setTimeout(() => {
-          isLoading.value = false
-          if (isDefaultAdmin) {
-            navigateTo('/admin')
-          } else {
-            navigateTo('/dashboard')
-          }
-        }, 800)
-        return true
-      }
-
       const regResponse = await apiCall<any>('/auth/register', 'POST', {
         email: emailVal,
         password: passwordVal,
         full_name: fullNameVal,
-        // username omitted — backend auto-generates a unique one from email prefix + random suffix
         phone: phoneVal || undefined
       })
 
@@ -313,10 +289,10 @@ export const useAuth = () => {
         return false
       }
 
-      // Auto-login
+      // Auto-login with real credentials
       return await login(emailVal, passwordVal)
     } catch (e: any) {
-      error.value = 'Failed to connect to backend.'
+      error.value = e?.message || 'Failed to connect to backend.'
       isLoading.value = false
       return false
     }
