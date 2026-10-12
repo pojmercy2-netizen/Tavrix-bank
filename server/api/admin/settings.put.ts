@@ -1,10 +1,9 @@
-import { readFileSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
 import { z } from 'zod'
 import { withErrorHandler, badRequest } from '../../utils/error'
 import { requireAdmin } from '../../utils/auth'
 import { logAdminAction } from '../../utils/adminLog'
 import { sendSuccess } from '../../utils/response'
+import { getGlobalSettings, saveGlobalSettings } from '../../utils/systemSettings'
 
 const updateSettingsSchema = z.object({
   supportEmail: z.string().email('Please enter a valid email address'),
@@ -15,16 +14,8 @@ export default withErrorHandler(async (event) => {
   const admin = await requireAdmin(event)
   const body = await readBody(event)
 
-  const validated = updateSettingsSchema.safeParse(body)
-  if (!validated.success) {
-    badRequest(validated.error.errors[0]?.message || 'Invalid input values')
-    return
-  }
-
-  const { supportEmail, supportPhone } = validated.data
-  const filePath = join(process.cwd(), 'server', 'data', 'global_settings.json')
-
-  const oldSettings = JSON.parse(readFileSync(filePath, 'utf-8'))
+  const { supportEmail, supportPhone } = updateSettingsSchema.parse(body)
+  const oldSettings = await getGlobalSettings()
 
   const newSettings = {
     ...oldSettings,
@@ -32,7 +23,7 @@ export default withErrorHandler(async (event) => {
     supportPhone
   }
 
-  writeFileSync(filePath, JSON.stringify(newSettings, null, 2), 'utf-8')
+  await saveGlobalSettings(newSettings)
 
   // Log admin audit action
   await logAdminAction(event, {

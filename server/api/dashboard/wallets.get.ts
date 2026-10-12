@@ -1,14 +1,10 @@
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
 import { withErrorHandler } from '../../utils/error'
 import { requireActiveUser } from '../../utils/auth'
 import { sendSuccess } from '../../utils/response'
+import { getCryptoWallets } from '../../utils/systemSettings'
 
 export default withErrorHandler(async (event) => {
   await requireActiveUser(event)
-
-  const filePath = join(process.cwd(), 'server', 'data', 'crypto_wallets.json')
-  const wallets = JSON.parse(readFileSync(filePath, 'utf-8'))
-
+  const wallets = await getCryptoWallets()
   return sendSuccess(event, wallets)
 })

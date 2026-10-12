@@ -1,10 +1,9 @@
-import { readFileSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
 import { z } from 'zod'
 import { withErrorHandler, badRequest } from '../../../utils/error'
 import { requireAdmin } from '../../../utils/auth'
 import { logAdminAction } from '../../../utils/adminLog'
 import { sendSuccess } from '../../../utils/response'
+import { getCryptoWallets, saveCryptoWallets } from '../../../utils/systemSettings'
 
 const updateWalletSchema = z.object({
   coin: z.enum(['BTC', 'ETH', 'USDT']),
@@ -17,34 +16,26 @@ export default withErrorHandler(async (event) => {
   const admin = await requireAdmin(event)
   const body = await readBody(event)
 
-  const validated = updateWalletSchema.safeParse(body)
-  if (!validated.success) {
-    badRequest(validated.error.errors[0]?.message || 'Invalid request body')
-    return
-  }
-
-  const { coin, address, network, label } = validated.data
-
-  const filePath = join(process.cwd(), 'server', 'data', 'crypto_wallets.json')
-  const wallets: Array<{ coin: string; label: string; network: string; address: string }> =
-    JSON.parse(readFileSync(filePath, 'utf-8'))
+  const { coin, address, network, label } = updateWalletSchema.parse(body)
+  const wallets = await getCryptoWallets()
 
   const idx = wallets.findIndex(w => w.coin === coin)
-  if (idx === -1) {
+  const targetWallet = wallets[idx]
+  if (idx === -1 || !targetWallet) {
     badRequest(`Coin "${coin}" not found in wallet config`)
     return
   }
 
-  const oldAddress = wallets[idx].address
-
-  wallets[idx] = {
-    ...wallets[idx],
-    address,
-    ...(network ? { network } : {}),
-    ...(label ? { label } : {})
+  const oldAddress = targetWallet.address
+  const updatedWallet = {
+    coin: targetWallet.coin,
+    label: label ?? targetWallet.label,
+    network: network ?? targetWallet.network,
+    address
   }
+  wallets[idx] = updatedWallet
 
-  writeFileSync(filePath, JSON.stringify(wallets, null, 2), 'utf-8')
+  await saveCryptoWallets(wallets)
 
   // Audit log
   await logAdminAction(event, {
@@ -55,5 +46,5 @@ export default withErrorHandler(async (event) => {
     details: { coin, oldAddress, newAddress: address }
   })
 
-  return sendSuccess(event, wallets[idx], `${coin} wallet address updated successfully`)
+  return sendSuccess(event, updatedWallet, `${coin} wallet address updated successfully`)
 })

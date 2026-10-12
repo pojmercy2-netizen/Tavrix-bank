@@ -8,4 +8,5 @@ export * from './transfers'
 export * from './notifications'
 export * from './admin_logs'
 export * from './cards'
+export * from './system_settings'
 

@@ -157,7 +157,7 @@ const typeLabel = (type: string) => {
 }
 
 const mapNotif = (n: any): Notif => {
-  const cfg = typeConfig[n.type] ?? typeConfig.info
+  const cfg = (n.type && typeConfig[n.type]) || typeConfig['info'] || { icon: 'lucide:info' }
   return {
     id: n.id,
     title: n.title,

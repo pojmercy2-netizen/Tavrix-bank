@@ -1,4 +1,4 @@
-﻿import nodemailer from 'nodemailer'
+import nodemailer from 'nodemailer'
 import { writeFileSync, existsSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -50,6 +50,9 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
   }
 
   // Fallback: log the email to console and a local file for local testing
+  console.log(`[Email Service] [MOCK MODE] Email sent to: ${options.to} | Subject: "${options.subject}"`)
+  console.log(`[Email Service] [MOCK BODY]:\n${options.text}`)
+
   try {
     const logsDir = join(process.cwd(), 'server', 'data', 'logs')
     if (!existsSync(logsDir)) {
@@ -67,14 +70,13 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
 ${options.text}
 ========================================
 `
-    // Append to file
+    // Append to file if writable
     writeFileSync(logPath, logEntry, { flag: 'a', encoding: 'utf-8' })
-    console.log(`[Email Service] [MOCK MODE] Email captured and logged to: ${logPath}`)
-    return true
-  } catch (logErr) {
-    console.error('[Email Service] Failed to write mock email log.', logErr)
-    return false
+  } catch {
+    // Read-only filesystem in serverless environments (Netlify / Lambda), safe to ignore
   }
+
+  return true
 }
 
 /**

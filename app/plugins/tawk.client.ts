@@ -5,17 +5,20 @@ export default defineNuxtPlugin(() => {
   // Avoid loading twice on hot-reload
   if (document.querySelector('script[src*="tawk.to"]')) return
 
-  // Initialise Tawk globals
-  ;(window as any).Tawk_API = (window as any).Tawk_API || {}
-  ;(window as any).Tawk_LoadStart = new Date()
+    // Initialise Tawk globals
+    ; (window as any).Tawk_API = (window as any).Tawk_API || {}
+    ; (window as any).Tawk_LoadStart = new Date()
 
   const s1 = document.createElement('script')
-  const s0 = document.getElementsByTagName('script')[0]
-
   s1.async = true
-  s1.src = 'https://embed.tawk.to/6a4a38f58f99461d47cf6e21/1jsout0ho'
+  s1.src = 'https://embed.tawk.to/6acc677aa9a1ef34c6bd58e3/1k4n78e23'
   s1.charset = 'UTF-8'
   s1.setAttribute('crossorigin', '*')
 
-  s0.parentNode?.insertBefore(s1, s0)
+  const s0 = document.getElementsByTagName('script')[0]
+  if (s0 && s0.parentNode) {
+    s0.parentNode.insertBefore(s1, s0)
+  } else {
+    document.head.appendChild(s1)
+  }
 })
