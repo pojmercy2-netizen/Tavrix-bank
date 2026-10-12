@@ -156,8 +156,12 @@ const dashboardMethods = [
 
 const loadAccountData = async () => {
   try {
-    // Fetch all accounts to compute true total balance
-    const accountsRes = await auth.apiCall<any>('/dashboard/accounts', 'GET')
+    // Fetch accounts and transactions concurrently to cut load time in half
+    const [accountsRes, txRes] = await Promise.all([
+      auth.apiCall<any>('/dashboard/accounts', 'GET'),
+      auth.apiCall<any>('/account/transactions', 'GET')
+    ])
+
     if (accountsRes.success && accountsRes.data) {
       const accounts: any[] = accountsRes.data?.data ?? accountsRes.data ?? []
       const total = accounts.reduce((sum: number, a: any) => sum + parseFloat(a.balance || 0), 0)
@@ -170,8 +174,6 @@ const loadAccountData = async () => {
       checkingBalance.value = 0
     }
 
-    // Fetch recent transactions
-    const txRes = await auth.apiCall<any>('/account/transactions', 'GET')
     if (txRes.success && txRes.data) {
       const txList: any[] = txRes.data?.data ?? txRes.data ?? []
       transactions.value = txList.map((tx: any) => ({

@@ -9,8 +9,9 @@ const route = useRoute()
 const isDashboard = computed(() => route.path.startsWith('/dashboard'))
 
 onMounted(() => {
-  // Set the configuration before loading the script
-  if (typeof window !== 'undefined') {
+  if (typeof window === 'undefined') return
+
+  const initGTranslate = () => {
     (window as any).gtranslateSettings = {
       default_language: 'en',
       wrapper_selector: '.gtranslate_wrapper',
@@ -18,13 +19,18 @@ onMounted(() => {
       switcher_horizontal_position: 'inline'
     }
 
-    // Only inject the script once
     if (!document.querySelector('script[src*="gtranslate"]')) {
       const script = document.createElement('script')
       script.src = 'https://cdn.gtranslate.net/widgets/latest/float.js'
       script.defer = true
       document.body.appendChild(script)
     }
+  }
+
+  if ('requestIdleCallback' in window) {
+    (window as any).requestIdleCallback(initGTranslate)
+  } else {
+    setTimeout(initGTranslate, 1200)
   }
 })
 </script>

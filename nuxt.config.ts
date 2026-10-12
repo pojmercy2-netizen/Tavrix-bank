@@ -1,4 +1,4 @@
-﻿// https://nuxt.com/docs/api/configuration/nuxt-config
+// https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   modules: [
     '@nuxt/eslint',
@@ -27,7 +27,13 @@ export default defineNuxtConfig({
 
   routeRules: {
     '/resources': { redirect: '/' },
-    '/resources/**': { redirect: '/' }
+    '/resources/**': { redirect: '/' },
+    '/api/settings': { swr: 60 },
+    '/api/health': { swr: 30 }
+  },
+
+  nitro: {
+    compressPublicAssets: true
   },
 
   css: ['~/assets/css/main.css'],

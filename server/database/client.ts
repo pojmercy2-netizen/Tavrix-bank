@@ -17,7 +17,8 @@ export function useDb() {
       max: 10,
       idle_timeout: 20,
       connect_timeout: 10,
-      ssl: 'require'
+      ssl: 'require',
+      prepare: false // Essential for Neon PgBouncer transaction pooling
     })
 
     _db = drizzle(client, { schema })
