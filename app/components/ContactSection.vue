@@ -77,26 +77,45 @@ const form = reactive({ firstName: '', lastName: '', email: '', subject: '', mes
 const submitted = ref(false)
 
 const supportEmail = ref('support@tavrixbank.com')
-const supportPhone = ref('+1 (800) 555-0199')
+const supportPhone = ref('+16064625390')
+const whatsappNumber = ref('+16064625390')
 
 const submitForm = () => {
   submitted.value = true
   setTimeout(() => { submitted.value = false }, 4000)
 }
 
+const cleanWhatsapp = computed(() => whatsappNumber.value.replace(/[^0-9]/g, ''))
+const cleanPhone = computed(() => supportPhone.value.replace(/[^+\d]/g, ''))
+
 const channels = computed(() => [
   { icon: 'lucide:mail', label: 'Email Us', value: supportEmail.value, href: `mailto:${supportEmail.value}` },
-  { icon: 'lucide:phone', label: 'Call Us', value: supportPhone.value, href: `tel:${supportPhone.value.replace(/[^+\d]/g, '')}` },
+  { icon: 'lucide:phone', label: 'Call Us', value: supportPhone.value, href: `tel:${cleanPhone.value}` },
+  { icon: 'logos:whatsapp-icon', label: 'WhatsApp', value: whatsappNumber.value, href: `https://wa.me/${cleanWhatsapp.value}?text=${encodeURIComponent('Hello! I would like to get in touch with Tavrix Bank.')}` },
   { icon: 'lucide:map-pin', label: 'Head Office', value: '200 Park Avenue, New York, NY 10166', href: '#' }
 ])
+
+const { data: initialSettings } = await useAsyncData('contact-settings', () => $fetch<any>('/api/settings'), {
+  default: () => null
+})
+
+if (initialSettings.value?.data) {
+  const data = initialSettings.value.data?.data ?? initialSettings.value.data
+  if (data?.supportEmail) supportEmail.value = data.supportEmail
+  if (data?.supportPhone) supportPhone.value = data.supportPhone
+  if (data?.whatsappNumber) whatsappNumber.value = data.whatsappNumber
+  else if (data?.supportPhone) whatsappNumber.value = data.supportPhone
+}
 
 onMounted(async () => {
   try {
     const res = await $fetch<any>('/api/settings')
-    if (res.success && res.data) {
+    if (res?.success && res?.data) {
       const data = res.data?.data ?? res.data
       if (data.supportEmail) supportEmail.value = data.supportEmail
       if (data.supportPhone) supportPhone.value = data.supportPhone
+      if (data.whatsappNumber) whatsappNumber.value = data.whatsappNumber
+      else if (data.supportPhone) whatsappNumber.value = data.supportPhone
     }
   } catch {
     // Fallback quietly

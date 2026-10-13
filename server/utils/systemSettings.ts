@@ -6,6 +6,7 @@ import { useDb, schema } from '../database/client'
 export interface GlobalSettings {
   supportEmail: string
   supportPhone: string
+  whatsappNumber: string
 }
 
 export interface CryptoWallet {
@@ -17,7 +18,8 @@ export interface CryptoWallet {
 
 export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   supportEmail: 'support@tavrixbank.com',
-  supportPhone: '+16064625390'
+  supportPhone: '+16064625390',
+  whatsappNumber: '+16064625390'
 }
 
 export const DEFAULT_CRYPTO_WALLETS: CryptoWallet[] = [
@@ -97,10 +99,11 @@ export async function getGlobalSettings(): Promise<GlobalSettings> {
 
     const first = record[0]
     if (first && first.value) {
-      const val = first.value as Partial<GlobalSettings>
+      const val = (typeof first.value === 'string' ? JSON.parse(first.value) : first.value) as Partial<GlobalSettings>
       return {
         supportEmail: val.supportEmail || DEFAULT_GLOBAL_SETTINGS.supportEmail,
-        supportPhone: val.supportPhone || DEFAULT_GLOBAL_SETTINGS.supportPhone
+        supportPhone: val.supportPhone || DEFAULT_GLOBAL_SETTINGS.supportPhone,
+        whatsappNumber: val.whatsappNumber || val.supportPhone || DEFAULT_GLOBAL_SETTINGS.whatsappNumber
       }
     }
   } catch {
@@ -108,10 +111,11 @@ export async function getGlobalSettings(): Promise<GlobalSettings> {
   }
 
   const localData = tryReadLocalJson<GlobalSettings>('global_settings.json')
-  if (localData && (localData.supportEmail || localData.supportPhone)) {
+  if (localData && (localData.supportEmail || localData.supportPhone || localData.whatsappNumber)) {
     return {
       supportEmail: localData.supportEmail || DEFAULT_GLOBAL_SETTINGS.supportEmail,
-      supportPhone: localData.supportPhone || DEFAULT_GLOBAL_SETTINGS.supportPhone
+      supportPhone: localData.supportPhone || DEFAULT_GLOBAL_SETTINGS.supportPhone,
+      whatsappNumber: localData.whatsappNumber || localData.supportPhone || DEFAULT_GLOBAL_SETTINGS.whatsappNumber
     }
   }
 
@@ -119,7 +123,13 @@ export async function getGlobalSettings(): Promise<GlobalSettings> {
 }
 
 export async function saveGlobalSettings(settings: GlobalSettings): Promise<GlobalSettings> {
-  tryWriteLocalJson('global_settings.json', settings)
+  const normalizedSettings: GlobalSettings = {
+    supportEmail: settings.supportEmail || DEFAULT_GLOBAL_SETTINGS.supportEmail,
+    supportPhone: settings.supportPhone || DEFAULT_GLOBAL_SETTINGS.supportPhone,
+    whatsappNumber: settings.whatsappNumber || settings.supportPhone || DEFAULT_GLOBAL_SETTINGS.whatsappNumber
+  }
+
+  tryWriteLocalJson('global_settings.json', normalizedSettings)
 
   try {
     const db = useDb()
@@ -129,13 +139,13 @@ export async function saveGlobalSettings(settings: GlobalSettings): Promise<Glob
       .insert(schema.systemSettings)
       .values({
         key: 'global_settings',
-        value: settings,
+        value: normalizedSettings,
         updatedAt: new Date()
       })
       .onConflictDoUpdate({
         target: schema.systemSettings.key,
         set: {
-          value: settings,
+          value: normalizedSettings,
           updatedAt: new Date()
         }
       })
@@ -143,7 +153,7 @@ export async function saveGlobalSettings(settings: GlobalSettings): Promise<Glob
     console.error('[SystemSettings] Failed to persist global settings to database:', err)
   }
 
-  return settings
+  return normalizedSettings
 }
 
 export async function getCryptoWallets(): Promise<CryptoWallet[]> {

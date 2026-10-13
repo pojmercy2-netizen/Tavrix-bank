@@ -37,14 +37,14 @@
 
       <div class="sidebar-help">
         <span class="help-title">Need help?</span>
-        <a href="tel:1-800-USA-BANK" class="help-link">
+        <a :href="'tel:' + cleanPhone" class="help-link" :title="'Call ' + supportPhone">
           <Icon name="lucide:phone" :size="16" />
-          1-800-USA-BANK
+          <span>{{ supportPhone }}</span>
         </a>
-        <button class="help-link" @click="handleChat">
-          <Icon name="lucide:message-square" :size="16" />
-          Live chat
-        </button>
+        <a :href="whatsappUrl" target="_blank" rel="noopener noreferrer" class="help-link whatsapp-help" @click="closeSidebar">
+          <Icon name="logos:whatsapp-icon" :size="16" />
+          <span>WhatsApp Chat</span>
+        </a>
       </div>
     </aside>
 
@@ -193,9 +193,21 @@ const handleLogout = () => {
   router.push('/login')
 }
 
+const supportPhone = ref('+16064625390')
+const whatsappNumber = ref('+16064625390')
+
+const cleanPhone = computed(() => supportPhone.value.replace(/[^+\d]/g, ''))
+const cleanWhatsapp = computed(() => whatsappNumber.value.replace(/[^0-9]/g, ''))
+const whatsappUrl = computed(() => {
+  const text = encodeURIComponent('Hello! I need support with my Tavrix Bank account.')
+  return `https://wa.me/${cleanWhatsapp.value}?text=${text}`
+})
+
 const handleChat = () => {
   closeSidebar()
-  alert('Connecting to live chat agent...')
+  if (import.meta.client) {
+    window.open(whatsappUrl.value, '_blank')
+  }
 }
 
 const fullName = ref('John Smith')
@@ -207,6 +219,20 @@ const initials = computed(() =>
 /* ---- notification badge ---- */
 const auth = useAuth()
 const unreadNotifCount = ref(0)
+
+const fetchSettings = async () => {
+  try {
+    const res = await $fetch<any>('/api/settings')
+    if (res?.success && res?.data) {
+      const data = res.data?.data ?? res.data
+      if (data.supportPhone) supportPhone.value = data.supportPhone
+      const num = data.whatsappNumber || data.supportPhone
+      if (num) whatsappNumber.value = num
+    }
+  } catch {
+    // silent fallback
+  }
+}
 
 const fetchUnreadCount = async () => {
   try {
@@ -221,6 +247,7 @@ const fetchUnreadCount = async () => {
 let notifPollTimer: ReturnType<typeof setInterval> | null = null
 
 onMounted(() => {
+  fetchSettings()
   const userStr = localStorage.getItem('user')
   const user = userStr ? JSON.parse(userStr) : null
   if (user?.fullName) {

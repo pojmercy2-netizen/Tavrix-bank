@@ -41,15 +41,28 @@ const openIndex = ref<number | null>(0)
 const toggle = (i: number) => { openIndex.value = openIndex.value === i ? null : i }
 
 const supportEmail = ref('support@tavrixbank.com')
+const supportPhone = ref('+16064625390')
+const whatsappNumber = ref('+16064625390')
+
+const { data: initialSettings } = await useAsyncData('faq-settings', () => $fetch<any>('/api/settings'), {
+  default: () => null
+})
+
+if (initialSettings.value?.data) {
+  const data = initialSettings.value.data?.data ?? initialSettings.value.data
+  if (data?.supportEmail) supportEmail.value = data.supportEmail
+  if (data?.supportPhone) supportPhone.value = data.supportPhone
+  if (data?.whatsappNumber) whatsappNumber.value = data.whatsappNumber
+}
 
 onMounted(async () => {
   try {
     const res = await $fetch<any>('/api/settings')
-    if (res.success && res.data) {
+    if (res?.success && res?.data) {
       const data = res.data?.data ?? res.data
-      if (data.supportEmail) {
-        supportEmail.value = data.supportEmail
-      }
+      if (data.supportEmail) supportEmail.value = data.supportEmail
+      if (data.supportPhone) supportPhone.value = data.supportPhone
+      if (data.whatsappNumber) whatsappNumber.value = data.whatsappNumber
     }
   } catch (err) {
     // Fallback quietly to default
@@ -83,7 +96,7 @@ const faqs = computed(() => [
   },
   {
     question: 'How do I contact customer support?',
-    answer: `Our support team is available 24/7 via live chat in the app, email at ${supportEmail.value}, or by calling our helpline. Average response time is under 2 minutes for chat and under 4 hours for email.`
+    answer: `Our support team is available 24/7 via WhatsApp (${whatsappNumber.value || supportPhone.value}), email at ${supportEmail.value}, or by calling ${supportPhone.value}. Average response time is under 2 minutes for WhatsApp and under 4 hours for email.`
   }
 ])
 </script>

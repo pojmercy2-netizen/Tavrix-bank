@@ -31,7 +31,7 @@ const route = useRoute()
 // Detect if we are inside the dashboard to adjust mobile layout offset
 const isDashboard = computed(() => route.path.startsWith('/dashboard'))
 
-const rawPhone = ref('+1 (800) 555-0199')
+const rawPhone = ref('+16064625390')
 
 // Strip non-digits to get a clean number for wa.me/ link
 const formattedPhone = computed(() => {
@@ -43,13 +43,26 @@ const whatsappUrl = computed(() => {
   return `https://wa.me/${formattedPhone.value}?text=${text}`
 })
 
+const { data: initialSettings } = await useAsyncData('whatsapp-settings', () => $fetch<any>('/api/settings'), {
+  default: () => null
+})
+
+if (initialSettings.value?.data) {
+  const payload = initialSettings.value.data?.data ?? initialSettings.value.data
+  const targetNum = payload?.whatsappNumber || payload?.supportPhone
+  if (targetNum) {
+    rawPhone.value = targetNum
+  }
+}
+
 const fetchSettings = async () => {
   try {
     const res = await $fetch<any>('/api/settings')
     if (res?.success && res?.data) {
       const data = res.data?.data ?? res.data
-      if (data.supportPhone) {
-        rawPhone.value = data.supportPhone
+      const targetNum = data.whatsappNumber || data.supportPhone
+      if (targetNum) {
+        rawPhone.value = targetNum
       }
     }
   } catch {

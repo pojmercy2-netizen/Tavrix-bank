@@ -16,10 +16,10 @@
             <a href="#" class="social-link" aria-label="Website">
               <Icon name="lucide:globe" :size="20" />
             </a>
-            <a href="#" class="social-link" aria-label="Chat">
-              <Icon name="lucide:message-circle" :size="20" />
+            <a :href="whatsappUrl" target="_blank" rel="noopener noreferrer" class="social-link whatsapp-social" aria-label="WhatsApp Support">
+              <Icon name="logos:whatsapp-icon" :size="20" />
             </a>
-            <a href="#" class="social-link" aria-label="Email">
+            <a :href="'mailto:' + supportEmail" class="social-link" aria-label="Support Email">
               <Icon name="lucide:mail" :size="20" />
             </a>
           </div>
@@ -54,8 +54,8 @@
         <div class="footer-column">
           <h4>Support</h4>
           <div class="footer-links">
-            <NuxtLink to="/register" class="footer-link">Help Center</NuxtLink>
-            <NuxtLink to="/register" class="footer-link">Contact Us</NuxtLink>
+            <NuxtLink to="/#faq" class="footer-link">Help Center</NuxtLink>
+            <NuxtLink to="/#contact" class="footer-link">Contact Us</NuxtLink>
             <NuxtLink to="/register" class="footer-link">Security Center</NuxtLink>
             <NuxtLink to="/register" class="footer-link">Fraud Protection</NuxtLink>
           </div>
@@ -75,7 +75,43 @@
 </template>
 
 <script setup lang="ts">
+import { ref, computed, onMounted } from 'vue'
+
 const currentYear = new Date().getFullYear()
+
+const supportEmail = ref('support@tavrixbank.com')
+const whatsappNumber = ref('+16064625390')
+
+const formattedWhatsapp = computed(() => whatsappNumber.value.replace(/[^0-9]/g, ''))
+const whatsappUrl = computed(() => {
+  const text = encodeURIComponent('Hello! I need support with my Tavrix Bank account.')
+  return `https://wa.me/${formattedWhatsapp.value}?text=${text}`
+})
+
+const { data: initialSettings } = await useAsyncData('footer-settings', () => $fetch<any>('/api/settings'), {
+  default: () => null
+})
+
+if (initialSettings.value?.data) {
+  const data = initialSettings.value.data?.data ?? initialSettings.value.data
+  if (data?.supportEmail) supportEmail.value = data.supportEmail
+  const num = data?.whatsappNumber || data?.supportPhone
+  if (num) whatsappNumber.value = num
+}
+
+onMounted(async () => {
+  try {
+    const res = await $fetch<any>('/api/settings')
+    if (res?.success && res?.data) {
+      const data = res.data?.data ?? res.data
+      if (data.supportEmail) supportEmail.value = data.supportEmail
+      const num = data.whatsappNumber || data.supportPhone
+      if (num) whatsappNumber.value = num
+    }
+  } catch {
+    // fallback quietly
+  }
+})
 </script>
 
 <style scoped>

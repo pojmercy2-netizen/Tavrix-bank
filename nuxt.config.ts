@@ -28,7 +28,7 @@ export default defineNuxtConfig({
   routeRules: {
     '/resources': { redirect: '/' },
     '/resources/**': { redirect: '/' },
-    '/api/settings': { swr: 60 },
+    '/api/settings': { cache: false },
     '/api/health': { swr: 30 }
   },
 

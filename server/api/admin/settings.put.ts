@@ -7,20 +7,22 @@ import { getGlobalSettings, saveGlobalSettings } from '../../utils/systemSetting
 
 const updateSettingsSchema = z.object({
   supportEmail: z.string().email('Please enter a valid email address'),
-  supportPhone: z.string().min(5, 'Helpline number is too short')
+  supportPhone: z.string().min(5, 'Helpline number is too short'),
+  whatsappNumber: z.string().min(5, 'WhatsApp number is too short').optional().or(z.literal(''))
 })
 
 export default withErrorHandler(async (event) => {
   const admin = await requireAdmin(event)
   const body = await readBody(event)
 
-  const { supportEmail, supportPhone } = updateSettingsSchema.parse(body)
+  const { supportEmail, supportPhone, whatsappNumber } = updateSettingsSchema.parse(body)
   const oldSettings = await getGlobalSettings()
 
   const newSettings = {
     ...oldSettings,
     supportEmail,
-    supportPhone
+    supportPhone,
+    whatsappNumber: whatsappNumber && whatsappNumber.trim().length > 0 ? whatsappNumber.trim() : supportPhone
   }
 
   await saveGlobalSettings(newSettings)

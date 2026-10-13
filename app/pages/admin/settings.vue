@@ -58,7 +58,23 @@
                 required
               />
             </div>
-            <span class="input-help"> Helplines and call buttons will redirect here</span>
+            <span class="input-help">Direct voice helpline and phone call buttons will dial here</span>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="whatsapp-phone">WhatsApp Support Number</label>
+            <div class="input-icon-wrapper">
+              <Icon name="logos:whatsapp-icon" class="input-icon" />
+              <input
+                id="whatsapp-phone"
+                v-model="form.whatsappNumber"
+                type="text"
+                placeholder="+16064625390"
+                class="form-input with-icon"
+                required
+              />
+            </div>
+            <span class="input-help">Floating WhatsApp widget and direct chat buttons will link here (with country code)</span>
           </div>
 
           <button type="submit" class="save-btn" :disabled="saving">
@@ -71,7 +87,7 @@
       <!-- Preview Card -->
       <div class="admin-card preview-card">
         <h3 class="card-title">Live Preview</h3>
-        <p class="card-desc">Here is how the contact details will appear to the visitors on landing pages.</p>
+        <p class="card-desc">Here is how the contact details will appear to the visitors across the platform.</p>
         
         <div class="preview-box">
           <div class="preview-item">
@@ -93,6 +109,16 @@
               <span class="preview-value">{{ form.supportPhone || '+1 (800) 555-0199' }}</span>
             </div>
           </div>
+
+          <div class="preview-item">
+            <div class="preview-icon whatsapp">
+              <Icon name="logos:whatsapp-icon" class="w-5 h-5" />
+            </div>
+            <div>
+              <span class="preview-label">WhatsApp Support</span>
+              <span class="preview-value">{{ form.whatsappNumber || form.supportPhone || '+16064625390' }}</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -109,7 +135,8 @@ const saving = ref(false)
 
 const form = reactive({
   supportEmail: '',
-  supportPhone: ''
+  supportPhone: '',
+  whatsappNumber: ''
 })
 
 const alert = reactive({
@@ -132,6 +159,7 @@ const loadSettings = async () => {
     const data = res.data?.data ?? res.data
     form.supportEmail = data.supportEmail || ''
     form.supportPhone = data.supportPhone || ''
+    form.whatsappNumber = data.whatsappNumber || data.supportPhone || ''
   } else {
     showAlert('error', res.error || 'Failed to load support settings.')
   }
@@ -142,7 +170,8 @@ const handleSave = async () => {
   saving.value = true
   const res = await auth.apiCall<any>('/admin/settings', 'PUT', {
     supportEmail: form.supportEmail.trim(),
-    supportPhone: form.supportPhone.trim()
+    supportPhone: form.supportPhone.trim(),
+    whatsappNumber: form.whatsappNumber.trim() || form.supportPhone.trim()
   })
 
   if (res.success) {
@@ -382,6 +411,11 @@ onMounted(() => {
 .preview-icon.phone {
   background: rgba(16, 185, 129, 0.12);
   color: #6ee7b7;
+}
+
+.preview-icon.whatsapp {
+  background: rgba(37, 211, 102, 0.12);
+  color: #25D366;
 }
 
 .preview-label {
